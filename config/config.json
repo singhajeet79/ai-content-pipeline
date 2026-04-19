@@ -1,0 +1,35 @@
+{
+  "channel_name": "Ajeet Singh",
+  "base_profile": {
+    "language": "Hindi",
+    "language_style": "Pure Hindi",
+    "genre": [
+      "Crime"
+    ],
+    "tone": [
+      "Dark",
+      "Cinematic"
+    ],
+    "duration_minutes": 1,
+    "char_per_min": 900,
+    "use_real_names": true,
+    "allow_dialogue": false
+  },
+  "limits": {
+    "max_scenes": 10,
+    "scene_batch_size": 3
+  },
+  "ui_params": {
+    "language": "English",
+    "language_style": "English Neutral",
+    "genre": [],
+    "tone": [
+      "Fun"
+    ],
+    "duration_minutes": 5,
+    "content_type": "Pixar Story",
+    "audience": "Kids 4-8",
+    "character_mode": "With Character",
+    "visual_style": "Pixar 3D"
+  }
+}

@@ -1,0 +1,12 @@
+Generate a cinematic voiceover style configuration.
+
+Voice Name: {{VOICE_NAME}}
+
+Style:
+- Deep, natural, human-like
+- Slight imperfections allowed
+- Emotional mix: tension + curiosity + seriousness
+- Non-robotic pacing
+- Natural pauses
+
+Output as structured config.
