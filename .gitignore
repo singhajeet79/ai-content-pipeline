@@ -1,4 +1,7 @@
 __pycache__/
 *.pyc
 .env
+.venv
 outputs/
+pyproject.toml
+.python-version
