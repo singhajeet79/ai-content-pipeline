@@ -87,3 +87,6 @@ def run_pipeline(config):
 
     print("🎉 Pipeline Completed Successfully")
 
+
+if __name__ == "__main__":
+    main()
