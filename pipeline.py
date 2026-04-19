@@ -7,12 +7,24 @@ from utils.config_loader import load_config
 from utils.llm import MockLLM
 from utils.output import save_outputs
 from utils.config_resolver import resolve_config
+from pathlib import Path
 import json
 
+BASE_DIR = Path(__file__).resolve().parent
+
 def load_config():
-    with open("config.json") as f:
+    config_path = BASE_DIR / "config" / "config.json"
+
+    if not config_path.exists():
+        raise FileNotFoundError(
+            f"Config file not found at {config_path}. "
+            f"Expected structure: /config/config.json"
+        )
+
+    with open(config_path, "r", encoding="utf-8") as f:
         return json.load(f)
-    
+
+
 def main():
     print("🚀 Pipeline Started")
 
@@ -75,6 +87,3 @@ def run_pipeline(config):
 
     print("🎉 Pipeline Completed Successfully")
 
-
-if __name__ == "__main__":
-    main()
