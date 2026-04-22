@@ -22,11 +22,15 @@
   "ui_params": {
     "language": "English",
     "language_style": "English Neutral",
-    "genre": [],
-    "tone": [
-      "Fun"
+    "genre": [
+      "Education",
+      "Horror"
     ],
-    "duration_minutes": 5,
+    "tone": [
+      "Fun",
+      "Emotional"
+    ],
+    "duration_minutes": 1,
     "content_type": "Pixar Story",
     "audience": "Kids 4-8",
     "character_mode": "With Character",

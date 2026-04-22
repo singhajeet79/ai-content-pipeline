@@ -1,28 +1,25 @@
 import json
+import re
+
+
+def clean_json_response(response: str) -> str:
+    response = re.sub(r"```json", "", response, flags=re.IGNORECASE)
+    response = re.sub(r"```", "", response)
+    return response.strip()
+
 
 def run(config, llm):
-    genre = ", ".join(config.get("genre", []))
-    tone = ", ".join(config.get("tone", []))
-    language = config.get("language", "English")
-    content_type = config.get("content_type", "General")
-    audience = config.get("audience", "General")
+    prompt = config.get("prompts", {}).get("topic_prompt")
 
-    prompt = f"""
-    Generate exactly 3 YouTube video topics.
-
-    Content Type: {content_type}
-    Audience: {audience}
-    Genre: {genre}
-    Tone: {tone}
-    Language: {language}
-
-    Return ONLY valid JSON in this format:
-    ["topic 1", "topic 2", "topic 3"]
-    """
+    # 🔴 HARD VALIDATION (NEW)
+    if not prompt or not prompt.strip():
+        raise ValueError("topic_prompt is missing or empty in config")
 
     response = llm.generate(prompt)
 
+    cleaned = clean_json_response(response)
+
     try:
-        return json.loads(response)
+        return json.loads(cleaned)
     except Exception:
         raise ValueError(f"Invalid JSON from LLM:\n{response}")

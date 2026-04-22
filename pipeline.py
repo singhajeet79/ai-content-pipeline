@@ -1,91 +1,234 @@
-# pipeline.py
-
+import json
+from pathlib import Path
 from agents import topic_agent, script_agent, scene_agent, visual_agent, voice_agent
 from agents.script_agent import extract_character_profile
-
-from utils.config_loader import load_config
-from utils.llm import MockLLM
+from utils.llm import get_llm
 from utils.output import save_outputs
 from utils.config_resolver import resolve_config
-from pathlib import Path
-import json
+from utils.retry import run_with_retry
+from repositories.pipeline_run_repository import PipelineRunRepository
+from utils.schema import (
+    TOPIC_SCHEMA, SCRIPT_SCHEMA, CHARACTER_SCHEMA,
+    SCENE_SCHEMA, VISUAL_SCHEMA, VOICE_SCHEMA
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
+
+# -----------------------
+# CONFIG
+# -----------------------
 def load_config():
-    config_path = BASE_DIR / "config" / "config.json"
-
-    if not config_path.exists():
-        raise FileNotFoundError(
-            f"Config file not found at {config_path}. "
-            f"Expected structure: /config/config.json"
-        )
-
-    with open(config_path, "r", encoding="utf-8") as f:
+    path = BASE_DIR / "config" / "config.json"
+    if not path.exists():
+        raise FileNotFoundError(f"Config missing at {path}")
+    with open(path, "r") as f:
         return json.load(f)
 
 
-def main():
-    print("🚀 Pipeline Started")
+# -----------------------
+# EXECUTION CONTRACT
+# -----------------------
+def validate_required_output(step_name, output):
+    """
+    Enforces that required steps must return valid, non-empty output.
+    """
+    if output is None:
+        raise Exception(f"{step_name} returned None")
 
-    raw_config = load_config()
-    print("✅ Config Loaded")
+    if isinstance(output, list) and len(output) == 0:
+        raise Exception(f"{step_name} returned empty list")
 
-    config = resolve_config(raw_config)
+    if isinstance(output, dict) and len(output) == 0:
+        raise Exception(f"{step_name} returned empty dict")
 
-    print("\n✅ FINAL RESOLVED CONFIG:\n")
-    print(json.dumps(config, indent=2))
+    return output
 
-    run_pipeline(config)
 
+def execute_step(step_name, fn, schema, agent_name, retries, delay, *args):
+    """
+    Wrapper for step execution with:
+    - retry
+    - validation
+    - clean logging
+    """
+    print(f"\n🔹 STEP: {step_name} → STARTED")
+
+    result = run_with_retry(fn, schema, agent_name, retries, delay, *args)
+
+    # enforce required output
+    result = validate_required_output(step_name, result)
+
+    print(f"✅ STEP: {step_name} → COMPLETED")
+
+    return result
+
+
+# -----------------------
+# PIPELINE
+# -----------------------
 def run_pipeline(config):
-    llm = MockLLM()
-    # Topic generation
-    print("⚡ Generating Topics...")
-    topics = topic_agent.run(config, llm)
-    print("📌 Topics:\n", topics)
+    llm = get_llm(config)
+    run_repo = PipelineRunRepository()
 
-    selected_topic = topics[0]
-    print(f"✅ Auto-selected topic: {selected_topic}")
+    run_id = run_repo.create_run(config)
+    print(f"🆔 Pipeline Run ID: {run_id}")
 
-    # Script generation
-    print("🧠 Generating Script...")
-    config["topic"] = selected_topic
-    script = script_agent.run(config, llm)
-    print("✅ Script Generated")
+    try:
+        # -----------------------
+        # TOPIC (REQUIRED)
+        # -----------------------
+        user_input = config.get("user_topic_input")
 
-    print("SCRIPT PREVIEW:\n", script[:200])
+        if user_input and user_input.strip():
+            print("\n🔹 STEP: TOPIC → SKIPPED (Using User Input)")
+            config["topic"] = user_input.strip()
+            run_repo.update_status(run_id, "TOPIC_SKIPPED_USER_INPUT")
+        else:
+            topics = execute_step(
+                "TOPIC",
+                topic_agent.run,
+                TOPIC_SCHEMA,
+                "topic_agent",
+                2,
+                1,
+                config,
+                llm
+            )
+            config["topic"] = topics[0]
+            run_repo.update_status(run_id, "TOPIC_DONE")
 
-    # Character extraction
-    print("👤 Extracting Character...")
-    character_memory = extract_character_profile(script, llm)
-    print("✅ Character Extracted:", character_memory)
+            import time
+            time.sleep(1.5)
 
-    # Scene extraction
-    print("🎬 Extracting Scenes...")
-    scenes = scene_agent.run(script, llm, config)
-    print(f"✅ Scenes Generated: {len(scenes)}")
+        # -----------------------
+        # SCRIPT (REQUIRED)
+        # -----------------------
+        script = execute_step(
+            "SCRIPT",
+            script_agent.run,
+            SCRIPT_SCHEMA,
+            "script_agent",
+            2,
+            1,
+            config,
+            llm
+        )
 
-    # Visual generation
-    print("🎨 Generating Visual Prompts...")
-    visuals = visual_agent.run(scenes, character_memory, llm, config)
-    print("✅ Visuals Generated")
+        run_repo.update_status(run_id, "SCRIPT_DONE")
 
-    # Voice
-    print("🎙️ Generating Voice Config...")
-    voice = voice_agent.run(llm)
-    print("✅ Voice Generated")
+        time.sleep(1.5)
 
-    print("💾 Saving Outputs...")
-    save_outputs({
-        "script": script,
-        "scenes": scenes,
-        "visuals": visuals,
-        "voice": voice,
-        "config": config
-    })
+        # -----------------------
+        # CHARACTER (REQUIRED)
+        # -----------------------
+        character = execute_step(
+            "CHARACTER",
+            extract_character_profile,
+            CHARACTER_SCHEMA,
+            "character_agent",
+            2,
+            1,
+            script,
+            llm
+        )
 
-    print("🎉 Pipeline Completed Successfully")
+        run_repo.update_status(run_id, "CHARACTER_DONE")
+
+        time.sleep(1.5) 
+        
+        # -----------------------
+        # SCENES (REQUIRED)
+        # -----------------------
+        scenes = execute_step(
+            "SCENES",
+            scene_agent.run,
+            SCENE_SCHEMA,
+            "scene_agent",
+            2,
+            1,
+            script,
+            llm,
+            config
+        )
+
+        run_repo.update_status(run_id, "SCENES_DONE")
+
+        time.sleep(1.5)
+
+        # -----------------------
+        # VISUALS (REQUIRED)
+        # -----------------------
+        visuals = execute_step(
+            "VISUALS",
+            visual_agent.run,
+            VISUAL_SCHEMA,
+            "visual_agent",
+            2,
+            1,
+            scenes,
+            character,
+            llm,
+            config
+        )
+
+        time.sleep(1.5)
+
+        # -----------------------
+        # VOICE (REQUIRED)
+        # -----------------------
+        voice = execute_step(
+            "VOICE",
+            voice_agent.run,
+            VOICE_SCHEMA,
+            "voice_agent",
+            2,
+            1,
+            llm,
+            config
+        )
+
+        time.sleep(1.5)
+        
+        # -----------------------
+        # SAVE OUTPUTS
+        # -----------------------
+        save_outputs({
+            "script": script,
+            "scenes": scenes,
+            "visuals": visuals,
+            "voice": voice,
+            "config": config
+        })
+
+        run_repo.update_status(
+            run_id,
+            "COMPLETED",
+            output_summary={"scenes": len(scenes)}
+        )
+
+        print("\n🎉 PIPELINE STATUS: COMPLETED")
+
+    except Exception as e:
+        run_repo.update_status(run_id, "FAILED", error=str(e))
+        print(f"\n❌ PIPELINE STATUS: FAILED → {e}")
+        raise
+
+
+# -----------------------
+# ENTRYPOINT
+# -----------------------
+def main():
+    print("🚀 PIPELINE STATUS: RUNNING")
+    config = resolve_config(load_config())
+    print("\n🔍 DEBUG: CONFIG KEYS →", list(config.keys()))
+
+    if "prompts" not in config:
+        print("❌ DEBUG: prompts NOT FOUND in config")
+    else:
+        print("✅ DEBUG: prompts FOUND")
+        print("🔍 DEBUG: topic_prompt length →", len(config["prompts"].get("topic_prompt", "")))
+    run_pipeline(config)
 
 
 if __name__ == "__main__":

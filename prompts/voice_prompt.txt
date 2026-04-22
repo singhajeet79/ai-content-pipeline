@@ -1,12 +1,20 @@
-Generate a cinematic voiceover style configuration.
+Generate voice configuration in STRICT JSON format.
 
-Voice Name: {{VOICE_NAME}}
+Output must match this schema exactly:
 
-Style:
-- Deep, natural, human-like
-- Slight imperfections allowed
-- Emotional mix: tension + curiosity + seriousness
-- Non-robotic pacing
-- Natural pauses
+{
+  "voice": "string",
+  "tone": "string",
+  "speed": "slow | medium | fast"
+}
 
-Output as structured config.
+Rules:
+- Do NOT include explanation
+- Do NOT include markdown
+- Do NOT include extra fields
+- Only return valid JSON
+
+Set:
+- voice = neutral narrator
+- tone = based on story tone
+- speed = medium

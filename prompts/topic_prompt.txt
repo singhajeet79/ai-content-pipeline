@@ -1,0 +1,10 @@
+Generate 3 unique short story topics for children.
+
+Requirements:
+- Output must be a JSON array
+- Each item should be a short story idea
+- Include both Hindi and English (if language is Hindi)
+- Keep it engaging and simple
+
+Output format strictly:
+["topic 1", "topic 2", "topic 3"]

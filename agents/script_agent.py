@@ -1,20 +1,26 @@
 def extract_character_profile(script, llm):
     prompt = f"""
-    Extract main character details from this script.
+Extract the MAIN character from the script.
 
-    Return JSON:
-    {{
-      "name": "",
-      "age": "",
-      "face_structure": "",
-      "skin_tone": "",
-      "hair_style": "",
-      "outfit": ""
-    }}
+Return ONLY valid JSON. No explanation.
 
-    Script:
-    {script}
-    """
+Schema:
+{{
+  "name": string,
+  "age": number,
+  "description": string
+}}
+
+Rules:
+- description MUST summarize the character in 1–2 sentences
+- age MUST be a number (not string, not empty)
+- If age is unknown, estimate a reasonable value
+- DO NOT include extra fields (no face_structure, outfit, etc.)
+- DO NOT return partial or invalid JSON
+
+Script:
+{script}
+"""
 
     return llm.generate_json(prompt)
 
